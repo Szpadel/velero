@@ -97,14 +97,6 @@ func (r *ResticRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	// If the repository is ready or not-ready, check it for stale locks, but if
-	// this fails for any reason, it's non-critical so we still continue on to the
-	// rest of the "process" logic.
-	log.Debug("Checking repository for stale locks")
-	if err := r.repositoryManager.UnlockRepo(resticRepo); err != nil {
-		log.WithError(err).Error("Error checking repository for stale locks")
-	}
-
 	switch resticRepo.Status.Phase {
 	case velerov1api.BackupRepositoryPhaseReady:
 		return ctrl.Result{}, r.runMaintenanceIfDue(ctx, resticRepo, log)
@@ -113,6 +105,16 @@ func (r *ResticRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ResticRepoReconciler) checkForStaleLocks(resticRepo *velerov1api.BackupRepository, log logrus.FieldLogger) {
+	// If the repository is ready or not-ready, check it for stale locks, but if
+	// this fails for any reason, it's non-critical so we still continue on to the
+	// rest of the "process" logic.
+	log.Debug("Checking repository for stale locks")
+	if err := r.repositoryManager.UnlockRepo(resticRepo); err != nil {
+		log.WithError(err).Error("Error checking repository for stale locks")
+	}
 }
 
 func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
@@ -190,6 +192,8 @@ func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 		return nil
 	}
 
+	r.checkForStaleLocks(req, log)
+
 	log.Info("Running maintenance on restic repository")
 
 	// prune failures should be displayed in the `.status.message` field but
@@ -216,6 +220,8 @@ func (r *ResticRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	if req.Spec.ResticIdentifier == "" {
 		return nil
 	}
+
+	r.checkForStaleLocks(req, log)
 
 	log.Info("Checking restic repository for readiness")
 

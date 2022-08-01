@@ -72,7 +72,18 @@ func TestPatchResticRepository(t *testing.T) {
 
 func TestCheckNotReadyRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	mgr := &resticmokes.RepositoryManager{}
+	reconciler := NewResticRepoReconciler(
+		velerov1api.DefaultNamespace,
+		velerotest.NewLogger(),
+		velerotest.NewFakeControllerRuntimeClient(t),
+		defaultMaintenanceFrequency,
+		mgr,
+	)
+
+	mgr.On("UnlockRepo", rr).Return(nil)
+	mgr.On("ConnectToRepo", rr).Return(nil)
+
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
@@ -86,7 +97,18 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "PruneRepo", rr, nil)
+	mgr := &resticmokes.RepositoryManager{}
+	reconciler := NewResticRepoReconciler(
+		velerov1api.DefaultNamespace,
+		velerotest.NewLogger(),
+		velerotest.NewFakeControllerRuntimeClient(t),
+		defaultMaintenanceFrequency,
+		mgr,
+	)
+
+	mgr.On("UnlockRepo", rr).Return(nil)
+	mgr.On("PruneRepo", rr).Return(nil)
+
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
